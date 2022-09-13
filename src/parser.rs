@@ -41,7 +41,8 @@ impl Expr {
 
         let field1 = get_field(parse);
         match parse.peek() {
-            Some((_, ')')) => {parse.next();},
+            Some((_, ')')) |
+            None => return field1,
             _   => (),
         }
         return match parse.next() {
@@ -50,8 +51,6 @@ impl Expr {
             Some((_, '*'))  => Expr::MUL(Box::new(field1), Box::new(get_field(parse))),
             Some((_, '/'))  => Expr::DIV(Box::new(field1), Box::new(get_field(parse))),
             Some((_, '^'))  => Expr::PWR(Box::new(field1), Box::new(get_field(parse))),
-            //Some((_, ')'))  => parse.next(),
-            None        => field1,
             v           => panic!("Unexpected character '{}' at {}", v.unwrap().1, v.unwrap().0 + 1),
         }
     }
@@ -91,15 +90,17 @@ impl Expr {
                         match parse.peek() {
                             Some((_, '(')) => {
                                 parse.next();
-                                return match text.as_str() {
+                                let foo = match text.as_str() {
                                     "abs" => Expr::ABS(Box::new(Expr::from_iter_and_bindings(parse, bindings))),
-                                    _ => panic!(),
-                                }},
+                                    _ => panic!()};
+                                parse.next();
+                                return foo;
+                                },
                             _   => {
                                 let binding = bindings.get(&text);
-                                match binding {
-                                    Some(a) => return (*a).clone(),
-                                    _   => panic!("Rule cant be applied! No binding for varible \"{}\"", text),
+                                return match binding {
+                                    Some(a) => (*a).clone(),
+                                    _   => Expr::VAL(Val::VAR(text)),
                                 }
                             }
                         }
@@ -111,15 +112,17 @@ impl Expr {
         }
 
         let field1 = get_field(parse, bindings);
-        //if parse.peek() == Some(&')') {parse.next();}
+        match parse.peek() {
+            Some((_, ')')) |
+            None => return field1,
+            _   => (),
+        }
         return match parse.next() {
-            Some((_, '+'))   => Expr::ADD(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '-'))   => Expr::SUB(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '*'))   => Expr::MUL(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '/'))   => Expr::DIV(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '^'))   => Expr::PWR(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, ')'))   => field1,
-            None        => field1,
+            Some((_, '+'))  => Expr::ADD(Box::new(field1), Box::new(get_field(parse, bindings))),
+            Some((_, '-'))  => Expr::SUB(Box::new(field1), Box::new(get_field(parse, bindings))),
+            Some((_, '*'))  => Expr::MUL(Box::new(field1), Box::new(get_field(parse, bindings))),
+            Some((_, '/'))  => Expr::DIV(Box::new(field1), Box::new(get_field(parse, bindings))),
+            Some((_, '^'))  => Expr::PWR(Box::new(field1), Box::new(get_field(parse, bindings))),
             v           => panic!("Unexpected character '{}' at {}", v.unwrap().1, v.unwrap().0 + 1),
         }
     }
