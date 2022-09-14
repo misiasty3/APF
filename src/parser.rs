@@ -100,7 +100,7 @@ impl Expr {
                                 let binding = bindings.get(&text);
                                 return match binding {
                                     Some(a) => (*a).clone(),
-                                    _   => Expr::VAL(Val::VAR(text)),
+                                    None    => panic!("Error: No binding found for verible {} in {:?}", text, bindings),
                                 }
                             }
                         }
