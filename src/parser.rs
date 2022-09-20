@@ -1,8 +1,5 @@
 use std::iter::Peekable;
-use std::collections::HashMap;
 use crate::library::{Expr, Val};
-
-// NOTE: Apparently I am very bad a creating parsers, so this etire file should be refactored
 
 impl Expr {
     pub fn from_iter<I: Iterator<Item = (usize, char)>>(parse: &mut Peekable<I>) -> Expr {
@@ -55,14 +52,6 @@ impl Expr {
         }
     }
 
-    pub fn from_string(x: String) -> Expr {
-        let mut iter = x.chars().filter(|x| !x.is_whitespace()).enumerate().peekable();
-        let foo = Expr::from_iter(&mut iter);
-        let next = iter.peek();
-        assert_eq!(next, None, "Unexpected token found at {}", next.unwrap().0 + 1);
-        foo
-    }
-
     pub fn from_str(x: &str) -> Expr {
         let mut iter = x.chars().filter(|x| !x.is_whitespace()).enumerate().peekable();
         let foo = Expr::from_iter(&mut iter);
@@ -70,84 +59,10 @@ impl Expr {
         assert_eq!(next, None, "Unexpected token found at {}", next.unwrap().0 + 1);
         foo
     }
-
-    pub fn from_iter_and_bindings<I: Iterator<Item = (usize, char)>>(parse: &mut Peekable<I>, bindings: &HashMap<String, &Expr>) -> Expr {
-        fn get_field<I: Iterator<Item = (usize, char)>>(parse: &mut Peekable<I>, bindings: &HashMap<String, &Expr>) -> Expr {
-            match parse.peek().unwrap() {
-                (_, '(') => {parse.next(); let foo = Expr::from_iter_and_bindings(parse, bindings); parse.next(); return foo},
-                v    => {
-                    if v.1.is_numeric() {
-                        let mut num: i64 = 0;
-                        while let Some((_, x)) = parse.next_if(|y| y.1.is_numeric()) {
-                            num = num*10 + x.to_digit(10).unwrap() as i64;
-                        }
-                        return Expr::VAL(Val::INT(num))
-                    } else if v.1.is_alphabetic() {
-                        let mut text = "".to_string();
-                        while let Some((_, x)) = parse.next_if(|y| y.1.is_alphabetic()) {
-                            text.push(x)
-                        }
-                        match parse.peek() {
-                            Some((_, '(')) => {
-                                parse.next();
-                                let foo = match text.as_str() {
-                                    "abs" => Expr::ABS(Box::new(Expr::from_iter_and_bindings(parse, bindings))),
-                                    _ => panic!()};
-                                parse.next();
-                                return foo;
-                                },
-                            _   => {
-                                let binding = bindings.get(&text);
-                                return match binding {
-                                    Some(a) => (*a).clone(),
-                                    None    => panic!("Error: No binding found for verible {} in {:?}", text, bindings),
-                                }
-                            }
-                        }
-                    } else {
-                        panic!("Unexpected character '{}' at {}", v.1, v.0 + 1);
-                    }
-                }
-            };
-        }
-
-        let field1 = get_field(parse, bindings);
-        match parse.peek() {
-            Some((_, ')')) |
-            None => return field1,
-            _   => (),
-        }
-        return match parse.next() {
-            Some((_, '+'))  => Expr::ADD(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '-'))  => Expr::SUB(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '*'))  => Expr::MUL(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '/'))  => Expr::DIV(Box::new(field1), Box::new(get_field(parse, bindings))),
-            Some((_, '^'))  => Expr::PWR(Box::new(field1), Box::new(get_field(parse, bindings))),
-            v           => panic!("Unexpected character '{}' at {}", v.unwrap().1, v.unwrap().0 + 1),
-        }
-    }
-
-    pub fn from_string_and_bindings(x: String, bindings: &HashMap<String, &Expr>) -> Expr {
-        let mut iter = x.chars().filter(|x| !x.is_whitespace()).enumerate().peekable();
-        let foo = Expr::from_iter_and_bindings(&mut iter, bindings);
-        let next = iter.peek();
-        assert_eq!(next, None, "Unexpected token found at {}", next.unwrap().0 + 1);
-        foo
-    }
-
-    pub fn from_str_and_bindings(x: &str, bindings: &HashMap<String, &Expr>) -> Expr {
-        let mut iter = x.chars().filter(|x| !x.is_whitespace()).enumerate().peekable();
-        let foo = Expr::from_iter_and_bindings(&mut iter, bindings);
-        let next = iter.peek();
-        assert_eq!(next, None, "Unexpected token found at {}", next.unwrap().0 + 1);
-        foo
-    }
 }
-
 
 mod tests {
     use crate::library::{Expr, Val};
-    use std::collections::HashMap;
 
     #[test]
     fn expr_from_str() {
@@ -181,31 +96,6 @@ mod tests {
         y = Expr::ADD(  Box::new(Expr::ABS( Box::new(Expr::VAL(Val::VAR("x".to_string()))))),
                         Box::new(Expr::SUB( Box::new(Expr::VAL(Val::INT(2))),
                                             Box::new(Expr::VAL(Val::VAR("y".to_string()))))));
-        assert_eq!(x, y);
-    }
-
-    #[test]
-    fn expr_from_str_and_bindings() {
-        let mut bindings;
-        let mut x;
-        let mut y;
-
-        let binding1 = Expr::from_str("1111*(975+1)");
-        bindings = HashMap::from([("a".to_string(), &binding1)]);
-        x = Expr::from_str_and_bindings("5*a", &bindings);
-        y = Expr::from_str("5*(1111*(975+1))");
-        assert_eq!(x, y);
-
-        let binding1 = Expr::from_str("1111*10");
-        let binding2 = Expr::from_str("z*(y+2)");
-        let binding3 = Expr::from_str("5");
-        bindings = HashMap::from([
-            ("a".to_string(), &binding1),
-            ("b".to_string(), &binding2),
-            ("c".to_string(), &binding3),
-        ]);
-        x = Expr::from_str_and_bindings("(abs(a)^c)+(c-b)", &bindings);
-        y = Expr::from_str("(abs(1111*10)^5)+(5-(z*(y+2)))");
         assert_eq!(x, y);
     }
 }
