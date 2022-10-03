@@ -20,5 +20,14 @@ fn find_proof(eq1: Expr, eq2: Expr, rules: Vec<Rule>, set: Settings) -> Result<V
 
 
 fn main() {
-    println!("{}", Expr::from_str("(x) + (2 - y)"));
+    let power_rule = Rule::new(Expr::from_str("x^2"), Expr::from_str("x*x"));
+    let mut new_expresions = vec![];
+    let mut subject = Expr::from_str("((5^2)^2) * ((x*y)^2)");
+    println!("subject: {subject}");
+    println!("{} => {}\n", power_rule.pattern, power_rule.substitute);
+
+    subject.create_variations(&power_rule, &mut new_expresions);
+    for i in new_expresions {
+        println!("{i}");
+    }
 }

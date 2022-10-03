@@ -29,8 +29,8 @@ pub enum Val {
 }
 
 pub struct Rule {
-    head: Expr,
-    body: Expr,
+    pub pattern: Expr,
+    pub substitute: Expr,
 }
 
 pub struct Proof {
@@ -90,33 +90,66 @@ impl fmt::Display for Expr {
 }
             
 impl Expr {
-    pub fn aplly_rule(&self, rule: &Rule, new_variations: &mut Vec<Expr>) {
-        fn apply_rule_rec<'a>(this: &'a Expr, rule: &Expr, bindings: &mut HashMap<String, &'a Expr>) -> bool {
-            match (this, rule) {
-                (Expr::ABS(a), Expr::ABS(b)) => apply_rule_rec(a, b, bindings),
-
-                (Expr::ADD(a, b), Expr::ADD(c, d)) => apply_rule_rec(a, c, bindings) && apply_rule_rec(b, d, bindings),
-                (Expr::SUB(a, b), Expr::SUB(c, d)) => apply_rule_rec(a, c, bindings) && apply_rule_rec(b, d, bindings),
-                (Expr::MUL(a, b), Expr::MUL(c, d)) => apply_rule_rec(a, c, bindings) && apply_rule_rec(b, d, bindings),
-                (Expr::DIV(a, b), Expr::DIV(c, d)) => apply_rule_rec(a, c, bindings) && apply_rule_rec(b, d, bindings),
-                (Expr::PWR(a, b), Expr::PWR(c, d)) => apply_rule_rec(a, c, bindings) && apply_rule_rec(b, d, bindings),
-
-                (a, Expr::VAL(Val::VAR(name))) => {
-                    if let Some(binding) = bindings.get(name) {
-                        return *binding == a;
-                    } else {
-                        bindings.insert(name.to_string(), a);
-                        return true;
-                    }
+    pub fn create_variations(&mut self, rule: &Rule, new_variations: &mut Vec<Expr>) {
+        unsafe {
+            let ptr: *mut Expr = self;
+            let sl = &mut *ptr;
+            sl.apply_rule_all(&*ptr, rule, new_variations);
+        }
+    }
+    fn apply_rule_all(&mut self, origin: &Expr, rule: &Rule, new_variations: &mut Vec<Expr>) {
+        fn apply_rule<'a>(ex: &'a Expr, pattern: &'a Expr, bindings: &mut HashMap<&'a String, &'a Expr>) -> bool {
+            match (ex, pattern) {
+                (Expr::ABS(a), Expr::ABS(b)) => apply_rule(a, b, bindings),
+                (Expr::ADD(a, b), Expr::ADD(c, d)) |
+                (Expr::SUB(a, b), Expr::SUB(c, d)) |
+                (Expr::MUL(a, b), Expr::MUL(c, d)) |
+                (Expr::DIV(a, b), Expr::DIV(c, d)) |
+                (Expr::PWR(a, b), Expr::PWR(c, d)) => {
+                    apply_rule(a, c, bindings) &&
+                    apply_rule(b, d, bindings)
                 },
-
-                _   => false,
+                (a, Expr::VAL(Val::VAR(name))) => 
+                    match bindings.get(name) {
+                        Some(x) => a == *x,
+                        None => {bindings.insert(name, a); true},
+                    }
+                (Expr::VAL(a), Expr::VAL(b)) => a == b,
+                _ => false,
             }
         }
 
+        match self {
+            Expr::VAL(_) => {},
+            Expr::ABS(a) => a.apply_rule_all(origin, rule, new_variations),
+            Expr::ADD(a, b) |
+            Expr::SUB(a, b) |
+            Expr::MUL(a, b) |
+            Expr::DIV(a, b) |
+            Expr::PWR(a, b) => {
+                a.apply_rule_all(origin, rule, new_variations);
+                b.apply_rule_all(origin, rule, new_variations);
+            },
+        }
+
         let mut bindings = HashMap::new();
-        if apply_rule_rec(self, &rule.head, &mut bindings) {
-            todo!();
+        if apply_rule(&self, &rule.pattern, &mut bindings) {
+            let cln = self.clone();
+            *self = Expr::from_rule(&rule.substitute, &mut bindings);
+            new_variations.push(origin.clone());
+            *self = cln;
+        }
+    }
+    pub fn from_rule(substitute: &Expr, bindings: &mut HashMap<&String, &Expr>) -> Expr {
+        match substitute {
+            Expr::ABS(a) => Expr::from_rule(a, bindings),
+            Expr::ADD(a, b) => Expr::ADD(Box::new(Expr::from_rule(a, bindings)), Box::new(Expr::from_rule(b, bindings))),
+            Expr::SUB(a, b) => Expr::SUB(Box::new(Expr::from_rule(a, bindings)), Box::new(Expr::from_rule(b, bindings))),
+            Expr::MUL(a, b) => Expr::MUL(Box::new(Expr::from_rule(a, bindings)), Box::new(Expr::from_rule(b, bindings))),
+            Expr::DIV(a, b) => Expr::DIV(Box::new(Expr::from_rule(a, bindings)), Box::new(Expr::from_rule(b, bindings))),
+            Expr::PWR(a, b) => Expr::PWR(Box::new(Expr::from_rule(a, bindings)), Box::new(Expr::from_rule(b, bindings))),
+            Expr::VAL(Val::VAR(name)) => (*bindings.get(&name).expect(format!("no binding \"{}\" in HashMap {:?}", name, bindings).as_str())).clone(),
+            Expr::VAL(a) => Expr::VAL(a.clone()),
         }
     }
 }
@@ -128,6 +161,12 @@ impl fmt::Display for Val {
             Val::VAR(a) => write!(f, "{}", a),
             _   => todo!(),
         }
+    }
+}
+
+impl Rule {
+    pub fn new(p: Expr, s: Expr) -> Self {
+        Self {pattern: p, substitute: s}
     }
 }
 
@@ -143,7 +182,7 @@ impl Default for Settings {
 
 #[cfg(test)]
 mod tests {
-    use crate::library::{Expr, Val, Settings};
+    use crate::library::{Expr, Val};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hasher;
     use std::hash::Hash;
