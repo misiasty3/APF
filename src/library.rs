@@ -78,13 +78,13 @@ impl Hash for Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::VAL(a)    => {write!(f, "{}", a)},
-            Expr::ABS(a)    => {write!(f, "abs({})", a)},
-            Expr::ADD(a, b) => {write!(f, "({}) + ({})", a, b)},
-            Expr::SUB(a, b) => {write!(f, "({}) - ({})", a, b)},
-            Expr::MUL(a, b) => {write!(f, "({}) * ({})", a, b)},
-            Expr::DIV(a, b) => {write!(f, "({}) / ({})", a, b)},
-            Expr::PWR(a, b) => {write!(f, "({}) ^ ({})", a, b)},
+            Expr::VAL(a)    => write!(f, "{}", a),
+            Expr::ABS(a)    => write!(f, "abs({})", a),
+            Expr::ADD(a, b) => write!(f, "({} + {})", a, b),
+            Expr::SUB(a, b) => write!(f, "({} - {})", a, b),
+            Expr::MUL(a, b) => write!(f, "({} * {})", a, b),
+            Expr::DIV(a, b) => write!(f, "({} / {})", a, b),
+            Expr::PWR(a, b) => write!(f, "({} ^ {})", a, b),
         }
     }
 }
