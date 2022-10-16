@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashSet, HashMap};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::fmt;
 
@@ -33,14 +33,10 @@ pub struct Rule {
     pub substitute: Expr,
 }
 
-pub struct Proof {
-    p: Result<Vec<(Expr, Expr)>, &'static str>
-}
-
-pub struct Settings {
-    max_equation_length_in_bytes: usize,
-    max_equations_tried: usize,
-    stop_on_first_proof: bool,
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+pub enum ExSide {
+    Right,
+    Left
 }
 
 impl PartialEq for Expr {
@@ -59,6 +55,8 @@ impl PartialEq for Expr {
         }
     }
 }
+
+impl Eq for Expr {}
 
 impl Hash for Expr {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -167,16 +165,6 @@ impl fmt::Display for Val {
 impl Rule {
     pub fn new(p: Expr, s: Expr) -> Self {
         Self {pattern: p, substitute: s}
-    }
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Settings {
-            max_equation_length_in_bytes: 1024,
-            max_equations_tried: 10000,
-            stop_on_first_proof: true,
-        }
     }
 }
 
